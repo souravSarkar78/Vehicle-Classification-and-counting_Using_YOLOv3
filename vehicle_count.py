@@ -8,10 +8,11 @@ tracker = EuclideanDistTracker()
 cap = cv2.VideoCapture('video4.mp4')
 whT = 320
 
+# Detection confidence threshold
 confThreshold =0.1
 nmsThreshold= 0.2
 
-font_color = (0, 255, 200)
+font_color = (0, 0, 255)
 font_size = 0.5
 font_thickness = 2
 
@@ -21,12 +22,15 @@ up_line_position = middle_line_position - 15
 down_line_position = middle_line_position + 15
 
 
-## Coco Names
+# Store Coco Names in a list
 classesFile = "coco.names"
 classNames = []
 with open(classesFile, 'rt') as f:
     classNames = f.read().rstrip('\n').split('\n')
 print(classNames)
+
+# class index for our required detection classes
+required_class_index = [2, 3, 5, 7]
 
 
 ## Model Files
@@ -41,9 +45,6 @@ net = cv2.dnn.readNetFromDarknet(modelConfiguration, modelWeights)
 net.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
 net.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
 
-# class index for our required detection classes
-required_class_index = [2, 3, 5, 7]
-
 # Define random colour for each class
 np.random.seed(42)
 colors = np.random.randint(0, 255, size=(len(classNames), 3), dtype='uint8')
@@ -57,6 +58,7 @@ def find_center(x, y, w, h):
     cy=y+y1
     return cx, cy
     
+# List for store vehicle count information
 temp_up_list = []
 temp_down_list = []
 up_list = [0, 0, 0, 0]
@@ -78,12 +80,10 @@ def count_vehicle(box_id):
             temp_up_list.append(id)
 
     elif iy < down_line_position and iy > middle_line_position:
-
         if id not in temp_down_list:
             temp_down_list.append(id)
             
     elif iy < up_line_position:
-
         if id in temp_down_list:
             temp_down_list.remove(id)
             up_list[index] = up_list[index]+1
@@ -95,7 +95,7 @@ def count_vehicle(box_id):
 
     # Draw circle in the middle of the rectangle
     cv2.circle(img, center, 2, (0, 0, 255), -1)  # end here
-    print(up_list, down_list)
+    # print(up_list, down_list)
 
 # Function for finding the detected objects from the network output
 def findObjects(outputs,img):
@@ -130,13 +130,17 @@ def findObjects(outputs,img):
         # print(d)
         color = [int(c) for c in colors[classIds[i]]]
         name = classNames[classIds[i]]
+
+        # Draw classname and confidence score 
         cv2.putText(img,f'{name.upper()} {int(confs[i]*100)}%',
                   (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+
+        # Draw bounding rectangle
         cv2.rectangle(img, (x, y), (x + w, y + h), color, 1)
         detection.append([x, y, w, h, required_class_index.index(classIds[i])])
 
+    # Update the tracker for each object
     boxes_ids = tracker.update(detection)
-    # print(boxes_ids)
     for box_id in boxes_ids:
         count_vehicle(box_id)
 
