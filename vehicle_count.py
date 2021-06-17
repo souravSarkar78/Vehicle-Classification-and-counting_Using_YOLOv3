@@ -4,7 +4,7 @@ import numpy as np
 from tracker import *
 tracker = EuclideanDistTracker()
 
-cap = cv2.VideoCapture('video.mp4')
+cap = cv2.VideoCapture('video4.mp4')
 whT = 320
 confThreshold =0.1
 nmsThreshold= 0.2
@@ -14,7 +14,7 @@ motorbike = 0
 bus = 0
 truck = 0
 
-middle_line_position = 250
+middle_line_position = 225
 up_line_position = middle_line_position - 20
 down_line_position = middle_line_position + 20
 
@@ -78,7 +78,7 @@ down = 0
 def count_vehicle(box_id, name):
     global up, down
 
-    x, y, w, h, id = box_id
+    x, y, w, h, id, name = box_id
 
     # Find the center of the rectangle for detection
     center = find_center(x, y, w, h)
@@ -107,7 +107,7 @@ def count_vehicle(box_id, name):
             up +=1
             update_count(name)
 
-    print(up, down, car, motorbike, bus, truck)
+    # print(up, down, car, motorbike, bus, truck)
 
     # Draw circle in the middle of the rectangle
     cv2.circle(img, center, 2, (0, 0, 255), -1)  # end here
@@ -145,18 +145,19 @@ def findObjects(outputs,img):
         x, y, w, h = box[0], box[1], box[2], box[3]
         # print(x,y,w,h)
 
-        detection.append([x, y, w, h])
-        # print(d)
         
-    boxes_ids = tracker.update(detection)
-    for box_id in boxes_ids:
-        x, y, w, h, id = box_id
-        cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 1)
+        # print(d)
         color = [int(c) for c in colors[classIds[i]]]
         name = classNames[classIds[i]]
         cv2.putText(img,f'{name.upper()} {int(confs[i]*100)}%',
                   (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+        cv2.rectangle(img, (x, y), (x + w, y + h), color, 1)
+        detection.append([x, y, w, h, name])
 
+    boxes_ids = tracker.update(detection)
+
+    for box_id in boxes_ids:
+        x, y, w, h, id, name = box_id
         count_vehicle(box_id, name)
 
 
@@ -175,10 +176,10 @@ while True:
     cv2.line(img, (0, middle_line_position), (iw, middle_line_position), (255, 0, 255), 1)
     cv2.line(img, (0, up_line_position), (iw, up_line_position), (0, 0, 255), 1)
     cv2.line(img, (0, down_line_position), (iw, down_line_position), (0, 0, 255), 1)
-    cv2.putText(img, "Car: "+str(car), (20, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
-    cv2.putText(img, "Motorbike: "+str(motorbike), (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
-    cv2.putText(img, "Bus: "+str(bus), (20, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
-    cv2.putText(img, "Truck: "+str(truck), (20, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+    cv2.putText(img, "Car: "+str(car), (20, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+    cv2.putText(img, "Motorbike: "+str(motorbike), (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+    cv2.putText(img, "Bus: "+str(bus), (20, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+    cv2.putText(img, "Truck: "+str(truck), (20, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
     cv2.imshow('Image', img)
 
     if cv2.waitKey(1) == ord('q'):
