@@ -1,15 +1,20 @@
+
+# Import necessary packages
+
 import cv2
 import csv
 import numpy as np
 from tracker import *
+
+# Initialize Tracker
 tracker = EuclideanDistTracker()
 
 # Initialize the videocapture object
-cap = cv2.VideoCapture('video4.mp4')
-whT = 320
+cap = cv2.VideoCapture('video.mp4')
+input_size = 320
 
 # Detection confidence threshold
-confThreshold =0.1
+confThreshold =0.2
 nmsThreshold= 0.2
 
 font_color = (0, 0, 255)
@@ -24,10 +29,9 @@ down_line_position = middle_line_position + 15
 
 # Store Coco Names in a list
 classesFile = "coco.names"
-classNames = []
-with open(classesFile, 'rt') as f:
-    classNames = f.read().rstrip('\n').split('\n')
+classNames = open(classesFile).read().strip().split('\n')
 print(classNames)
+print(len(classNames))
 
 # class index for our required detection classes
 required_class_index = [2, 3, 5, 7]
@@ -35,10 +39,10 @@ required_class_index = [2, 3, 5, 7]
 
 ## Model Files
 modelConfiguration = 'yolov3-320.cfg'
-modelWeights = 'yolov3-320.weights'
+modelWeigheights = 'yolov3-320.weights'
 
 # configure the network model
-net = cv2.dnn.readNetFromDarknet(modelConfiguration, modelWeights)
+net = cv2.dnn.readNetFromDarknet(modelConfiguration, modelWeigheights)
 
 # Configure the network backend
 
@@ -98,11 +102,11 @@ def count_vehicle(box_id):
     # print(up_list, down_list)
 
 # Function for finding the detected objects from the network output
-def findObjects(outputs,img):
-    hT, wT, cT = img.shape
-    bbox = []
+def postProcess(outputs,img):
+    height, width = img.shape[:2]
+    boxes = []
     classIds = []
-    confs = []
+    confidence_scores = []
     detection = []
     for output in outputs:
         for det in output:
@@ -112,28 +116,25 @@ def findObjects(outputs,img):
             if classId in required_class_index:
                 if confidence > confThreshold:
                     # print(classId)
-                    w,h = int(det[2]*wT) , int(det[3]*hT)
-                    x,y = int((det[0]*wT)-w/2) , int((det[1]*hT)-h/2)
-                    bbox.append([x,y,w,h])
+                    w,h = int(det[2]*width) , int(det[3]*height)
+                    x,y = int((det[0]*width)-w/2) , int((det[1]*height)-h/2)
+                    boxes.append([x,y,w,h])
                     classIds.append(classId)
-                    confs.append(float(confidence))
+                    confidence_scores.append(float(confidence))
 
-    indices = cv2.dnn.NMSBoxes(bbox, confs, confThreshold, nmsThreshold)
+    # Apply Non-Max Suppression
+    indices = cv2.dnn.NMSBoxes(boxes, confidence_scores, confThreshold, nmsThreshold)
     # print(classIds)
-    for i in indices:
-        i = i[0]
-        box = bbox[i]
-        x, y, w, h = box[0], box[1], box[2], box[3]
+    for i in indices.flatten():
+        x, y, w, h = boxes[i][0], boxes[i][1], boxes[i][2], boxes[i][3]
         # print(x,y,w,h)
 
-        
-        # print(d)
         color = [int(c) for c in colors[classIds[i]]]
         name = classNames[classIds[i]]
 
         # Draw classname and confidence score 
-        cv2.putText(img,f'{name.upper()} {int(confs[i]*100)}%',
-                  (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+        cv2.putText(img,f'{name.upper()} {int(confidence_scores[i]*100)}%',
+                  (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
 
         # Draw bounding rectangle
         cv2.rectangle(img, (x, y), (x + w, y + h), color, 1)
@@ -149,7 +150,7 @@ while True:
     success, img = cap.read()
     img = cv2.resize(img,(0,0),None,0.5,0.5)
     ih, iw, channels = img.shape
-    blob = cv2.dnn.blobFromImage(img, 1 / 255, (whT, whT), [0, 0, 0], 1, crop=False)
+    blob = cv2.dnn.blobFromImage(img, 1 / 255, (input_size, input_size), [0, 0, 0], 1, crop=False)
 
     # Set the input of the network
     net.setInput(blob)
@@ -158,13 +159,14 @@ while True:
     # Feed data to the network
     outputs = net.forward(outputNames)
    
-    findObjects(outputs,img)
+    # Find the objects from the network output
+    postProcess(outputs,img)
 
     # Draw the crossing lines
 
-    cv2.line(img, (0, middle_line_position), (iw, middle_line_position), (255, 0, 255), 1)
-    cv2.line(img, (0, up_line_position), (iw, up_line_position), (0, 0, 255), 1)
-    cv2.line(img, (0, down_line_position), (iw, down_line_position), (0, 0, 255), 1)
+    cv2.line(img, (0, middle_line_position), (iw, middle_line_position), (255, 0, 255), 2)
+    cv2.line(img, (0, up_line_position), (iw, up_line_position), (0, 0, 255), 2)
+    cv2.line(img, (0, down_line_position), (iw, down_line_position), (0, 0, 255), 2)
 
     # Draw counting texts in the frame
     cv2.putText(img, "Up", (110, 20), cv2.FONT_HERSHEY_SIMPLEX, font_size, font_color, font_thickness)
@@ -173,7 +175,9 @@ while True:
     cv2.putText(img, "Motorbike:  "+str(up_list[1])+"     "+ str(down_list[1]), (20, 60), cv2.FONT_HERSHEY_SIMPLEX, font_size, font_color, font_thickness)
     cv2.putText(img, "Bus:        "+str(up_list[2])+"     "+ str(down_list[2]), (20, 80), cv2.FONT_HERSHEY_SIMPLEX, font_size, font_color, font_thickness)
     cv2.putText(img, "Truck:      "+str(up_list[3])+"     "+ str(down_list[3]), (20, 100), cv2.FONT_HERSHEY_SIMPLEX, font_size, font_color, font_thickness)
-    cv2.imshow('Image', img)
+
+    # Show the frames
+    cv2.imshow('Output', img)
 
     if cv2.waitKey(1) == ord('q'):
         break
@@ -188,6 +192,7 @@ with open("data.csv", 'w') as f1:
     cwriter.writerow(up_list)
     cwriter.writerow(down_list)
 f1.close()
+# print("Data saved at 'data.csv'")
 # Finally realese the capture object and destroy all active windows
 cap.release()
 cv2.destroyAllWindows()
