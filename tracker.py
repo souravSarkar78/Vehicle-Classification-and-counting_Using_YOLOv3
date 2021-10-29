@@ -1,4 +1,3 @@
-# TechVidvan Vehicle-Tracker
 
 import math
 
